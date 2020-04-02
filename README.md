@@ -9,6 +9,22 @@ in the format; however at the moment that is not feasible. To my knowledge there
 and as such I have had to reverse engineer everything myself. There is still a significant amount of knowledge missing and as a
 result, I cannot produce models in this format at the present time.
 
+## Compilation
+
+This codebase depends on CGLM (available on GitHub), glfw and libepoxy.
+Once those are installed you can compile with make.
+
+## Usage
+
+The program requires as an argument the path to a valid SSM file.
+
+Example:
+
+```
+./main ~/.wine/drive_c/Program\ Files\ \(x86\)/Primal\
+Prey/Home/models/animals/utahraptor.ssm
+```
+
 ## Screenshots
 
 ![Triceratops](images/trike.png?raw=true "Triceratops")

@@ -21,8 +21,7 @@ The program requires as an argument the path to a valid SSM file.
 Example:
 
 ```
-./main ~/.wine/drive_c/Program\ Files\ \(x86\)/Primal\
-Prey/Home/models/animals/utahraptor.ssm
+./main ~/.wine/drive_c/Program\ Files\ \(x86\)/Primal\ Prey/Home/models/animals/utahraptor.ssm
 ```
 
 ## Screenshots

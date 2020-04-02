@@ -1,6 +1,5 @@
 #include "ssm.h"
 
-#include "obj.h"
 #include "mesh.h"
 
 #include <stdio.h>

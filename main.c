@@ -10,7 +10,6 @@
 #include <math.h>
 #include <string.h>
 
-#include "obj.h"
 #include "ssm.h"
 #include "mesh.h"
 #include "shader.h"
@@ -87,17 +86,23 @@ int main(int argc, char* argv[])
     largest_x = 0.0f;
 
     vp = ssm.frame_table[0];
-    for(int i = 0; i < ssm.num_vertices; i++) {
 
-        if(fabs(*(vp + i)) > largest_vert) largest_vert = fabs(*(vp + i));
-    }
+    for(int j = 0; j < ssm.num_frames; j++) {
 
-    for(int i = 1; i < ssm.num_vertices; i += 3) {
+        vp = ssm.frame_table[j];
 
-        if(fabs(*(vp + i)) > largest_y) largest_y = fabs(*(vp + i));
-        if(fabs(*(vp + i - 1)) > largest_x) largest_x = fabs(*(vp + i - 1));
-        if(fabs(*(vp + i + 1)) > largest_z) largest_z = fabs(*(vp + i + 1));
-        if(*(vp + i + 1) < largest_z) largest_z = *(vp + i + 1);
+        for(int i = 0; i < ssm.num_vertices; i++) {
+
+            if(fabs(*(vp + i)) > largest_vert) largest_vert = fabs(*(vp + i));
+        }
+
+        for(int i = 1; i < ssm.num_vertices; i += 3) {
+
+            if(fabs(*(vp + i)) > largest_y) largest_y = fabs(*(vp + i));
+            if(fabs(*(vp + i - 1)) > largest_x) largest_x = fabs(*(vp + i - 1));
+            if(fabs(*(vp + i + 1)) > largest_z) largest_z = fabs(*(vp + i + 1));
+            if(*(vp + i + 1) < smallest_z) smallest_z = *(vp + i + 1);
+        }
     }
 
     printf("Biggest vert: %f\n", largest_vert);
@@ -107,7 +112,7 @@ int main(int argc, char* argv[])
 
     glm_mat4_identity(model);
     glm_translate_z(model, -2 * ((largest_x > largest_y) ? largest_x : largest_y));
-    glm_translate_y(model, -(largest_z - smallest_z));
+    glm_translate_y(model, -0.5 * (largest_z + smallest_z));
     glm_rotate_x(model, glm_rad(-90), model);
 
     printf("Loaded:  %s\n", argv[1]);

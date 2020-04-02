@@ -9,6 +9,13 @@ in the format; however at the moment that is not feasible. To my knowledge there
 and as such I have had to reverse engineer everything myself. There is still a significant amount of knowledge missing and as a
 result, I cannot produce models in this format at the present time.
 
+## Screenshots
+
+![Triceratops](images/trike.png?raw=true "Triceratops")
+![Utahraptor](images/utahraptor.png?raw=true "Utahraptor")
+![Tyrannosaurus](images/t_rex.png?raw=true "Tyrannosaurus")
+![Rail Gun](images/railgun.png?raw=true "Railgun")
+
 ## TODO
 
 Right now the codebase is a complete mess. This was a hastily programmed tool

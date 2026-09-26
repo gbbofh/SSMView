@@ -25,7 +25,7 @@ With a multiconfiguration generator, the executable is typically `build/Release/
 | Highlight suspected origin pair | M or Origin pair button |
 | Recenter camera | R or Reset button |
 
-The file uses Z-up coordinates. The viewer maps them to raylib's Y-up space as `(x, z, -y)`; the red, green, and blue lines indicate file X, Z, and Y axes respectively. Mesh groups get distinct colors. Geometry is displayed without textures: SSM references external STX files and this project does not yet decode them or map skin texture IDs to render materials.
+The file uses Z-up coordinates. The viewer maps them to raylib's Y-up space as `(x, z, -y)`; the red, green, and blue lines indicate file X, Z, and Y axes respectively. SSM triangles have the opposite winding to raylib's counterclockwise `DrawTriangle3D`, so their last two corners are swapped for rendering and the per-face lighting normal uses the same order. Backface culling stays disabled for inspection. Mesh groups get distinct colors. Geometry is displayed without textures: SSM references external STX files and this project does not yet decode them or map skin texture IDs to render materials.
 
 ## Format notes and changes from the original viewer
 

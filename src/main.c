@@ -142,7 +142,8 @@ static void draw_model(const Viewer *v) {
         f1 = a->frame_ids[(v->pose+1 < a->count) ? v->pose+1 : (v->loop ? 0 : v->pose)];
         blend = clampf(v->elapsed/a->durations[v->pose], 0, 1);
     }
-    /* Polygon winding differs across meshes; debug both sides. */
+    /* SSM triangles use the opposite winding from raylib's CCW DrawTriangle3D.
+       Keep both sides visible for inspection, including overlapping surfaces. */
     rlDisableBackfaceCulling();
     for (unsigned i = 0; i < m->triangle_count; i++) {
         const SsmTriangle *tri = &m->triangles[i];
@@ -153,11 +154,12 @@ static void draw_model(const Viewer *v) {
         Vector3 c = lerp_vertex(m, f0, f1, tri->vertex[2], blend);
         Color base = mesh_color(mesh_id);
         if (!v->wire) {
-            Vector3 u = {b.x-a.x,b.y-a.y,b.z-a.z}, w = {c.x-a.x,c.y-a.y,c.z-a.z};
+            Vector3 u = {c.x-a.x,c.y-a.y,c.z-a.z}, w = {b.x-a.x,b.y-a.y,b.z-a.z};
             Vector3 n = {u.y*w.z-u.z*w.y, u.z*w.x-u.x*w.z, u.x*w.y-u.y*w.x};
             float len = sqrtf(n.x*n.x+n.y*n.y+n.z*n.z);
-            float light = len > 1e-8f ? 0.64f + 0.36f*fabsf((n.x*0.35f+n.y*0.85f+n.z*0.4f)/len) : 0.75f;
-            DrawTriangle3D(a,b,c,(Color){(unsigned char)(base.r*light),(unsigned char)(base.g*light),(unsigned char)(base.b*light),255});
+            float diffuse = len > 1e-8f ? fmaxf(0.0f,(n.x*0.35f+n.y*0.85f+n.z*0.4f)/len) : 0.0f;
+            float light = 0.45f + 0.55f*diffuse;
+            DrawTriangle3D(a,c,b,(Color){(unsigned char)(base.r*light),(unsigned char)(base.g*light),(unsigned char)(base.b*light),255});
         } else {
             DrawLine3D(a,b,base); DrawLine3D(b,c,base); DrawLine3D(c,a,base);
         }

@@ -16,6 +16,7 @@ typedef struct {
     Vector3 center, target;
     float radius, distance, yaw, pitch;
     int animation, pose, list_scroll;
+    int marker[2]; /* Inferred stationary origin quad, or -1 when absent. */
     float elapsed, speed;
     bool playing, loop, wire, show_marker, mesh_visible[256];
 } Viewer;
@@ -53,6 +54,46 @@ static void fit_model(Viewer *v) {
     v->radius = fmaxf(0.5f, sqrtf((high.x-low.x)*(high.x-low.x) + (high.y-low.y)*(high.y-low.y) + (high.z-low.z)*(high.z-low.z))*0.5f);
     reset_camera(v);
 }
+static void find_marker(Viewer *v) {
+    const Ssm *m=&v->model;
+    bool stationary[65536]={0};
+    v->marker[0]=v->marker[1]=-1;
+    for (unsigned i=0;i<m->vertex_count;i++) {
+        SsmVec3 first=m->frames[i];
+        stationary[i]=true;
+        for (unsigned f=1;f<m->frame_count;f++) {
+            SsmVec3 p=m->frames[(size_t)f*m->vertex_count+i];
+            if (fabsf(p.x-first.x)>1e-5f || fabsf(p.y-first.y)>1e-5f || fabsf(p.z-first.z)>1e-5f) {
+                stationary[i]=false;break;
+            }
+        }
+    }
+    for (unsigned i=0;i<m->triangle_count;i++) {
+        const SsmTriangle *a=&m->triangles[i];
+        bool valid=true;
+        for (int k=0;k<3;k++) {
+            SsmVec3 p=m->frames[a->vertex[k]];
+            if (!stationary[a->vertex[k]] || fabsf(p.z)>v->radius*0.001f) valid=false;
+        }
+        if (!valid) continue;
+        for (unsigned j=i+1;j<m->triangle_count;j++) {
+            const SsmTriangle *b=&m->triangles[j];
+            int common=0;
+            for (int k=0;k<3;k++) {
+                SsmVec3 p=m->frames[b->vertex[k]];
+                if (!stationary[b->vertex[k]] || fabsf(p.z)>v->radius*0.001f) valid=false;
+                for (int l=0;l<3;l++) if (b->vertex[k]==a->vertex[l]) common++;
+            }
+            if (!valid) { valid=true; continue; }
+            if (common!=2) continue;
+            SsmVec3 p=m->frames[a->vertex[0]], q=m->frames[a->vertex[1]], r=m->frames[a->vertex[2]];
+            float cross=(q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);
+            if (fabsf(cross)<1e-6f) continue;
+            v->marker[0]=(int)i;v->marker[1]=(int)j;
+            return;
+        }
+    }
+}
 static bool open_model(Viewer *v, const char *path) {
     Ssm replacement;
     char error[256];
@@ -68,10 +109,11 @@ static bool open_model(Viewer *v, const char *path) {
     v->animation = -1; v->pose = 0; v->elapsed = 0; v->playing = false; v->list_scroll = 0;
     for (int i = 0; i < 256; i++) v->mesh_visible[i] = true;
     fit_model(v);
+    find_marker(v);
     if (v->model.animation_count) select_animation(v, 0);
-    printf("%s: %u vertices, %u triangle records (%u renderable), %u meshes, %u frames, %u animations, %zu unparsed tail bytes\n",
-           path, v->model.vertex_count, v->model.triangle_count, v->model.triangle_count-1,
-           v->model.mesh_count, v->model.frame_count, v->model.animation_count, v->model.trailing_bytes);
+    printf("%s: %u vertices, %u triangle records, %u meshes, %u frames, %u animations, %zu unparsed tail bytes; origin pair: %d, %d\n",
+           path, v->model.vertex_count, v->model.triangle_count,
+           v->model.mesh_count, v->model.frame_count, v->model.animation_count, v->model.trailing_bytes, v->marker[0], v->marker[1]);
     return true;
 }
 
@@ -102,13 +144,14 @@ static void draw_model(const Viewer *v) {
     }
     /* Polygon winding differs across meshes; debug both sides. */
     rlDisableBackfaceCulling();
-    for (unsigned i = 1; i < m->triangle_count; i++) {
+    for (unsigned i = 0; i < m->triangle_count; i++) {
         const SsmTriangle *tri = &m->triangles[i];
-        if (!v->mesh_visible[tri->mesh_id]) continue;
+        unsigned mesh_id=i==0 ? 0 : tri->mesh_id;
+        if (!v->mesh_visible[mesh_id]) continue;
         Vector3 a = lerp_vertex(m, f0, f1, tri->vertex[0], blend);
         Vector3 b = lerp_vertex(m, f0, f1, tri->vertex[1], blend);
         Vector3 c = lerp_vertex(m, f0, f1, tri->vertex[2], blend);
-        Color base = mesh_color(tri->mesh_id);
+        Color base = mesh_color(mesh_id);
         if (!v->wire) {
             Vector3 u = {b.x-a.x,b.y-a.y,b.z-a.z}, w = {c.x-a.x,c.y-a.y,c.z-a.z};
             Vector3 n = {u.y*w.z-u.z*w.y, u.z*w.x-u.x*w.z, u.x*w.y-u.y*w.x};
@@ -119,13 +162,14 @@ static void draw_model(const Viewer *v) {
             DrawLine3D(a,b,base); DrawLine3D(b,c,base); DrawLine3D(c,a,base);
         }
     }
-    if (v->show_marker) {
-        const SsmTriangle *tri = &m->triangles[0];
-        Vector3 a = lerp_vertex(m,f0,f1,tri->vertex[0],blend);
-        Vector3 b = lerp_vertex(m,f0,f1,tri->vertex[1],blend);
-        Vector3 c = lerp_vertex(m,f0,f1,tri->vertex[2],blend);
-        DrawLine3D(a,b,YELLOW); DrawLine3D(b,c,YELLOW); DrawLine3D(c,a,YELLOW);
-        DrawSphereEx((Vector3){(a.x+b.x+c.x)/3,(a.y+b.y+c.y)/3,(a.z+b.z+c.z)/3},v->radius*0.015f,6,6,YELLOW);
+    if (v->show_marker && v->marker[0]>=0) {
+        for (int i=0;i<2;i++) {
+            const SsmTriangle *tri=&m->triangles[v->marker[i]];
+            Vector3 a=lerp_vertex(m,f0,f1,tri->vertex[0],blend);
+            Vector3 b=lerp_vertex(m,f0,f1,tri->vertex[1],blend);
+            Vector3 c=lerp_vertex(m,f0,f1,tri->vertex[2],blend);
+            DrawLine3D(a,b,YELLOW);DrawLine3D(b,c,YELLOW);DrawLine3D(c,a,YELLOW);
+        }
     }
     rlEnableBackfaceCulling();
 }
@@ -150,7 +194,7 @@ static void panel(Viewer *v) {
     basename = basename ? basename+1 : v->path;
     label(x+15,43, *basename ? basename : "Drop an .ssm file",RAYWHITE);
     if (v->model.frame_count) {
-        label(x+15,70,TextFormat("%u vertices  |  %u triangles",v->model.vertex_count,v->model.triangle_count-1),LIGHTGRAY);
+        label(x+15,70,TextFormat("%u vertices  |  %u triangles",v->model.vertex_count,v->model.triangle_count),LIGHTGRAY);
         label(x+15,94,TextFormat("%u meshes  |  %u poses",v->model.mesh_count,v->model.frame_count),LIGHTGRAY);
     }
     int top=132;
@@ -159,7 +203,7 @@ static void panel(Viewer *v) {
     if (button((Rectangle){x+197,top,88,32},"Reset",false)) reset_camera(v);
     top+=40;
     if (button((Rectangle){x+14,top,130,32},"Wireframe",v->wire)) v->wire=!v->wire;
-    if (button((Rectangle){x+152,top,133,32},"Marker",v->show_marker)) v->show_marker=!v->show_marker;
+    if (button((Rectangle){x+152,top,133,32},"Origin pair",v->show_marker)) v->show_marker=!v->show_marker;
     top+=47;
     label(x+15,top,TextFormat("Speed: %.2fx",v->speed),LIGHTGRAY);
     if (button((Rectangle){x+177,top-5,48,30},"-",false)) v->speed=clampf(v->speed/1.25f,0.1f,4);
@@ -193,8 +237,11 @@ static void panel(Viewer *v) {
     label(x+15,bottom,"Mouse: orbit / right drag: pan",LIGHTGRAY);
     label(x+15,bottom+23,"Wheel: zoom  |  Space: play",LIGHTGRAY);
     label(x+15,bottom+46,"Left/Right: pose  |  Up/Down: clip",LIGHTGRAY);
-    label(x+15,bottom+69,"W: wire  M: marker  R: reset",LIGHTGRAY);
-    label(x+15,bottom+92,"Drop another .ssm to open it",LIGHTGRAY);
+    label(x+15,bottom+69,"W: wire  M: origin  R: reset",LIGHTGRAY);
+    if (v->model.frame_count && v->marker[0]<0)
+        label(x+15,bottom+92,"No stationary origin pair found",LIGHTGRAY);
+    else
+        label(x+15,bottom+92,"Drop another .ssm to open it",LIGHTGRAY);
     if (v->message[0]) label(x+15,bottom+120,v->message,(Color){255,137,119,255});
 }
 

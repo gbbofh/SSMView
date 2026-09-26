@@ -22,7 +22,7 @@ typedef struct {
 typedef struct {
     uint16_t vertex_count, triangle_count, texture_count, frame_count, animation_count;
     uint8_t mesh_count;
-    SsmTriangle *triangles; /* Triangle 0 is a special record: mesh_id is mesh_count. */
+    SsmTriangle *triangles; /* Record 0 is geometry too; its mesh_id byte stores mesh_count. */
     char **texture_names;
     SsmVec3 *frames; /* Contiguous [frame_count][vertex_count]. File coordinates are Z-up. */
     SsmAnimation *animations;
